@@ -41,7 +41,8 @@ IPAddress subnet(255, 255, 255, 0);
 #endif
 
 // For TCP connection
-WiFiServer server(port);
+const unsigned int localTcpPort = 10130; // 10110 is official TCP and UDP NMEA 0183 Navigational Data Port
+WiFiServer server(localTcpPort);
 WiFiClient client;
 
 // For UDP connection
