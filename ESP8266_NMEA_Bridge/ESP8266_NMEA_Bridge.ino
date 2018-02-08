@@ -6,6 +6,7 @@
 // user or environmental safety.
 
 #include <ESP8266WiFi.h>
+#include <WiFiClient.h>
 #include <WiFiUdp.h>
 
 // config: ////////////////////////////////////////////////////////////
@@ -38,6 +39,10 @@ IPAddress staticIP(192, 168, 1, 75);
 IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
 #endif
+
+// For TCP connection
+WiFiServer server(port);
+WiFiClient client;
 
 // For UDP connection
 const unsigned int localUdpPort = 10120; // 10110 is official TCP and UDP NMEA 0183 Navigational Data Port
