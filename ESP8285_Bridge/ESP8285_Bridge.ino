@@ -42,7 +42,7 @@ IPAddress subnet(255, 255, 255, 0);
 // For UDP connection
 const unsigned int localUdpPort = 10120; // 10110 is official TCP and UDP NMEA 0183 Navigational Data Port
 const unsigned int remoteUdpPort = 10120;
-IPAddress remoteUDPIp(192, 168, 1, 255);
+IPAddress remoteUDPIp(192, 168, 1, 116);
 
 //////////////////////////////////////////////////////////////////////////
 
