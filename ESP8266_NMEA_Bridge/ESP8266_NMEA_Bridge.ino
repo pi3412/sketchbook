@@ -42,20 +42,15 @@ IPAddress subnet(255, 255, 255, 0);
 
 // For TCP connection
 const unsigned int localTcpPort = 10130; // 10110 is official TCP and UDP NMEA 0183 Navigational Data Port
-WiFiServer server(localTcpPort);
-WiFiClient client; // Client for TCP server
-WiFiClient client1; // Independent TCP Client
-IPAddress remoteTCP(192, 168, 1, 116);
+WiFiServer localServer(localTcpPort);
+WiFiClient localClient; // Client for TCP server
 
 // For UDP connection
 const unsigned int localUdpPort = 10120; // 10110 is official TCP and UDP NMEA 0183 Navigational Data Port
 const unsigned int remoteUdpPort = 10120;
 IPAddress remoteUDPIp(192, 168, 1, 255);
-
-//////////////////////////////////////////////////////////////////////////
-
-// A UDP instance to let us send and receive packets over UDP
 WiFiUDP udp;
+
 
 uint8_t buf1[bufferSize];
 uint8_t i1 = 0;
@@ -91,23 +86,25 @@ void setup() {
   // STATION mode (ESP connects to router and gets an IP)
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, pw);
+
 #ifdef STATIC_IP_ADDR
   WiFi.config(staticIP, gateway, subnet);
 #endif
+
   Serial.println("Before WiFi connection");
   while (WiFi.status() != WL_CONNECTED) {
     delay(100);
     Serial.print(".");
   }
 
-  Serial.println("Connected?");
   Serial.printf("WiFi connected with local IP address: ");
   Serial.println(WiFi.localIP());
-  
+
   udp.begin(localUdpPort); // start UDP server
   udp.beginPacket(remoteUDPIp, remoteUdpPort); // start UDP Packet
 
-  client1.connect(remoteTCP, localTcpPort);
+  localServer.begin();
+  localServer.setNoDelay(true);
 
   // swap serial port from USB to attached GPS: GPIO15/D8 (TX) and GPIO13/D7 (RX)
   delay(1000);
@@ -126,21 +123,41 @@ void loop() {
       Serial.write(buf1, packetSize);
     } */
 
-  client = server.available();
-  if (client.connected())  {
-    if (client.available())    {
-      readCh = client.read();
-      if (readCh > 0)    {
-        Serial.print(readCh);
-      }
+  /* client = server.available();
+    if (client.connected())  {
+     if (client.available())    {
+       readCh = client.read();
+       if (readCh > 0)    {
+         Serial.print(readCh);
+       }
+     }
+    } */
+
+  //check if there are any new clients
+  if (localServer.hasClient()) {
+    if (!localClient.connected()) {
+      if (localClient) localClient.stop();
+      localClient = localServer.available();
     }
   }
+
+  //check a client for data
+  if (localClient && localClient.connected()) {
+    if (localClient.available()) {
+      size_t len = localClient.available();
+      uint8_t sbuf[len];
+      localClient.readBytes(sbuf, len);
+      Serial.write(sbuf, len);
+    }
+  }
+
 
   readCh = Serial.read();
   if (readCh > 0) {
     udp.write(readCh);
-    client.write(readCh); 
-    client1.write(readCh); 
+    if (localClient && localClient.connected()) {
+      localClient.write(readCh);
+    }
     switch (SentencePart) {
       case Header:
         if (charCount < NMEA_HEADER_LENGTH)  { // Header not yet complete
