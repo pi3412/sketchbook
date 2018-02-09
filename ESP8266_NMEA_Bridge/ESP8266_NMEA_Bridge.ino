@@ -13,7 +13,6 @@
 
 #define GPS_BAUD 9600
 #define PLOTTER_BAUD 4800
-#define packTimeout 5 // ms (if nothing more on UART, then send packet)
 #define bufferSize 255
 
 //#define STATIC_IP_ADDR
@@ -32,8 +31,8 @@ enum TypSentencePart { Header, Body, Parity, Other };
 TypSentencePart SentencePart (Other);
 
 // For WiFi Station
-const char *ssid = "SSID03";  // Your ROUTER SSID
-const char *pw = "frechsinddiedaxeamlaufendenband"; // and WiFi PASSWORD
+const char *ssid = "*****";  // Your ROUTER SSID
+const char *pw = "*****"; // and WiFi PASSWORD
 #ifdef STATIC_IP_ADDR
 IPAddress staticIP(192, 168, 1, 75);
 IPAddress gateway(192, 168, 1, 1);
@@ -72,7 +71,7 @@ int fromHex(char a)
 
 void setup() {
 
-  delay(500);
+  delay(100);
 
   // start 1st serial connection to dump WIFI status messages over USB
   Serial.begin(GPS_BAUD);
@@ -91,7 +90,7 @@ void setup() {
   WiFi.config(staticIP, gateway, subnet);
 #endif
 
-  Serial.println("Before WiFi connection");
+  Serial.println("Connexting to WiFi:");
   while (WiFi.status() != WL_CONNECTED) {
     delay(100);
     Serial.print(".");
@@ -115,24 +114,6 @@ void setup() {
 
 void loop() {
 
-  // if there’s UDP data available, read a packet
-  /*  int packetSize = udp.parsePacket();
-    if (packetSize > 0) {
-      udp.read(buf1, bufferSize);
-      // and then send it to GPS:
-      Serial.write(buf1, packetSize);
-    } */
-
-  /* client = server.available();
-    if (client.connected())  {
-     if (client.available())    {
-       readCh = client.read();
-       if (readCh > 0)    {
-         Serial.print(readCh);
-       }
-     }
-    } */
-
   //check if there are any new clients
   if (localServer.hasClient()) {
     if (!localClient.connected()) {
@@ -151,10 +132,10 @@ void loop() {
     }
   }
 
-
+  // Read and process serial GPS port
   readCh = Serial.read();
   if (readCh > 0) {
-    udp.write(readCh);
+//    udp.write(readCh);
     if (localClient && localClient.connected()) {
       localClient.write(readCh);
     }
@@ -185,11 +166,16 @@ void loop() {
           charCount = 0;
           if (usableSentence) {
             Serial1.printf("$GP");
+            udp.printf("$GP");
             Serial1.print(text[2]);
+            udp.print(text[2]);
             Serial1.print(text[3]);
+            udp.print(text[3]);
             Serial1.print(text[4]);
+            udp.print(text[4]);
             text[charCount++] = readCh; // The character (,) of this loop must be read, otherwise it is lost
             Serial1.printf(",");
+            udp.printf(",");
             parityIn ^= (byte)readCh;
             parityOut ^= (byte)readCh;
             SentencePart = Body;
@@ -204,6 +190,7 @@ void loop() {
         }
         else { // Body not complete yet
           Serial1.write(readCh);
+          udp.write(readCh);
           parityIn ^= (byte)readCh;
           parityOut ^= (byte)readCh;
         }
@@ -217,12 +204,16 @@ void loop() {
           byte checksum = 16 * fromHex(text[0]) + fromHex(text[1]);
           if (checksum == parityIn) { // Parity OK, sentence can be written with new parity
             Serial1.printf("*");
+            udp.printf("*");
             Serial1.print(parityOut, HEX);
+            udp.print(parityOut, HEX);
           }
           else { // Parity NOK, sentence will be witten with parity '00'
             Serial1.printf("*00");
+            udp.printf("*00");
           }
           Serial1.printf("\r\n");
+          udp.printf("\r\n");
           parityIn = 0;
           charCount = 0;
           SentencePart = Other;
