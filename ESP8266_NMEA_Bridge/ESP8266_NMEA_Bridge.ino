@@ -32,8 +32,8 @@ enum TypSentencePart { Header, Body, Parity, Other };
 TypSentencePart SentencePart (Other);
 
 // For WiFi Station
-const char *ssid = "pups";  // Your ROUTER SSID
-const char *pw = "pups"; // and WiFi PASSWORD
+const char *ssid = "SSID03";  // Your ROUTER SSID
+const char *pw = "frechsinddiedaxeamlaufendenband"; // and WiFi PASSWORD
 #ifdef STATIC_IP_ADDR
 IPAddress staticIP(192, 168, 1, 75);
 IPAddress gateway(192, 168, 1, 1);
@@ -43,7 +43,9 @@ IPAddress subnet(255, 255, 255, 0);
 // For TCP connection
 const unsigned int localTcpPort = 10130; // 10110 is official TCP and UDP NMEA 0183 Navigational Data Port
 WiFiServer server(localTcpPort);
-WiFiClient client;
+WiFiClient client; // Client for TCP server
+WiFiClient client1; // Independent TCP Client
+IPAddress remoteTCP(192, 168, 1, 116);
 
 // For UDP connection
 const unsigned int localUdpPort = 10120; // 10110 is official TCP and UDP NMEA 0183 Navigational Data Port
@@ -80,7 +82,7 @@ void setup() {
   // start 1st serial connection to dump WIFI status messages over USB
   Serial.begin(GPS_BAUD);
   while (!Serial) ; // wait for Serial Monitor to open
-//  Serial.println("Serial connection established");
+  //  Serial.println("Serial connection established");
 
   // start 2nd serial connection to GPS Plotter via pin GPIO2/D4 (no receive possible)
   Serial1.begin(PLOTTER_BAUD);
@@ -97,32 +99,48 @@ void setup() {
     delay(100);
     Serial.print(".");
   }
-  
+
   Serial.println("Connected?");
   Serial.printf("WiFi connected with local IP address: ");
   Serial.println(WiFi.localIP());
+  
   udp.begin(localUdpPort); // start UDP server
   udp.beginPacket(remoteUDPIp, remoteUdpPort); // start UDP Packet
 
+  client1.connect(remoteTCP, localTcpPort);
+
   // swap serial port from USB to attached GPS: GPIO15/D8 (TX) and GPIO13/D7 (RX)
-  delay(2000);
+  delay(1000);
   Serial.swap();
+  delay(1000);
 }
 
 
 void loop() {
 
   // if there’s UDP data available, read a packet
-  int packetSize = udp.parsePacket();
-  if (packetSize > 0) {
-    udp.read(buf1, bufferSize);
-    // and then send it to GPS:
-    Serial.write(buf1, packetSize);
+  /*  int packetSize = udp.parsePacket();
+    if (packetSize > 0) {
+      udp.read(buf1, bufferSize);
+      // and then send it to GPS:
+      Serial.write(buf1, packetSize);
+    } */
+
+  client = server.available();
+  if (client.connected())  {
+    if (client.available())    {
+      readCh = client.read();
+      if (readCh > 0)    {
+        Serial.print(readCh);
+      }
+    }
   }
 
   readCh = Serial.read();
   if (readCh > 0) {
     udp.write(readCh);
+    client.write(readCh); 
+    client1.write(readCh); 
     switch (SentencePart) {
       case Header:
         if (charCount < NMEA_HEADER_LENGTH)  { // Header not yet complete
