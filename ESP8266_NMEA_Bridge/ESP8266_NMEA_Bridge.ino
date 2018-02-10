@@ -31,8 +31,8 @@ enum TypSentencePart { Header, Body, Parity, Other };
 TypSentencePart SentencePart (Other);
 
 // For WiFi Station
-const char *ssid = "*****";  // Your ROUTER SSID
-const char *pw = "*****"; // and WiFi PASSWORD
+const char *ssid = "pups";  // Your ROUTER SSID
+const char *pw = "pups"; // and WiFi PASSWORD
 #ifdef STATIC_IP_ADDR
 IPAddress staticIP(192, 168, 1, 75);
 IPAddress gateway(192, 168, 1, 1);
@@ -47,7 +47,7 @@ WiFiClient localClient; // Client for TCP server
 // For UDP connection
 const unsigned int localUdpPort = 10120; // 10110 is official TCP and UDP NMEA 0183 Navigational Data Port
 const unsigned int remoteUdpPort = 10120;
-IPAddress remoteUDPIp(192, 168, 1, 255);
+IPAddress remoteUDPIp(255, 255, 255, 255);
 WiFiUDP udp;
 
 
@@ -98,9 +98,22 @@ void setup() {
 
   Serial.printf("WiFi connected with local IP address: ");
   Serial.println(WiFi.localIP());
+  remoteUDPIp = WiFi.localIP();
+  remoteUDPIp[3] = 255;
 
   udp.begin(localUdpPort); // start UDP server
+
   udp.beginPacket(remoteUDPIp, remoteUdpPort); // start UDP Packet
+  udp.printf("GPS TCP/IP address: ");
+  udp.print(WiFi.localIP());
+  udp.printf("/");
+  udp.println(localTcpPort);
+  udp.endPacket();
+
+  udp.beginPacket(remoteUDPIp, remoteUdpPort); // start UDP Packet
+
+  Serial.printf("Remote UDP IP address: ");
+  Serial.println(remoteUDPIp);
 
   localServer.begin();
   localServer.setNoDelay(true);
@@ -135,7 +148,7 @@ void loop() {
   // Read and process serial GPS port
   readCh = Serial.read();
   if (readCh > 0) {
-//    udp.write(readCh);
+    //    udp.write(readCh);
     if (localClient && localClient.connected()) {
       localClient.write(readCh);
     }
@@ -225,9 +238,11 @@ void loop() {
             charCount = 0;
             SentencePart = Header;
             break;
-          case '\n': // Now begins a new line and therefore a new UDP Packet
-            udp.endPacket();
-            udp.beginPacket(remoteUDPIp, remoteUdpPort);
+          case '\n': // Now begins a new line
+            if (usableSentence) {   // And after a valid sentence a new UDP Packet
+              udp.endPacket();
+              udp.beginPacket(remoteUDPIp, remoteUdpPort);
+            }
             break;
         }
         break;
