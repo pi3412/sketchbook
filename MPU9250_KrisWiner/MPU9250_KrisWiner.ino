@@ -191,7 +191,6 @@ Adafruit_PCD8544 display = Adafruit_PCD8544(PA4, PA3, PA2, PA1, PA0);
 // Using the MSENSR-9250 breakout board, ADO is set to 0 
 // Seven-bit device address is 110100 for ADO = 0 and 110101 for ADO = 1
 
-=======
 #define ADO 0
 
 #if ADO
@@ -317,7 +316,8 @@ void setup()
   display.display();
   delay(1000); 
 
-  if (c == 0x71) // WHO_AM_I should always be 0x68
+//  if (c == 0x71) // WHO_AM_I should always be 0x68
+  if (c == 0x73) // WHO_AM_I should always be 0x68
   {  
     Serial.println("MPU9250 is online...");
     
