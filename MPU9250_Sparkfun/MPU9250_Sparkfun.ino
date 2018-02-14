@@ -26,10 +26,10 @@
  #include "quaternionFilters.h"
  #include "MPU9250.h"
 
-/* #ifdef LCD
+// #ifdef LCD
 #include <Adafruit_GFX.h>
 #include <Adafruit_PCD8544.h>
-
+/*
 // Using NOKIA 5110 monochrome 84 x 48 pixel display
 // pin 9 - Serial clock out (SCLK)
 // pin 8 - Serial data out (DIN)

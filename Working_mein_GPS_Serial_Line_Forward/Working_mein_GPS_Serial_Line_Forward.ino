@@ -6,7 +6,6 @@
 // -----          --------              -------         ------------
 // Arduino Uno        9                   8               10
 // Arduino Pro Mini   9 (silbern im Eck)  8(der daneben)  10(auf der anderen Seite im Eck)
-// bla bla
 
 AltSoftSerial altSerial;
 
