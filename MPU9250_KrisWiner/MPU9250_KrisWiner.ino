@@ -190,7 +190,10 @@ Adafruit_PCD8544 display = Adafruit_PCD8544(PA4, PA3, PA2, PA1, PA0);
 
 // Using the MSENSR-9250 breakout board, ADO is set to 0 
 // Seven-bit device address is 110100 for ADO = 0 and 110101 for ADO = 1
-#define ADO 1
+
+=======
+#define ADO 0
+
 #if ADO
 #define MPU9250_ADDRESS 0x69  // Device address when ADO = 1
 #else
@@ -230,7 +233,9 @@ float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
   
 // Pin definitions
 int intPin = 12;  // These can be changed, 2 and 3 are the Arduinos ext int pins
-int myLed = 13; // Set up pin 13 led for toggling
+
+int myLed = PC13; // Set up pin 13 led for toggling
+
 
 int16_t accelCount[3];  // Stores the 16-bit signed accelerometer sensor output
 int16_t gyroCount[3];   // Stores the 16-bit signed gyro sensor output
@@ -274,12 +279,6 @@ void setup()
   Wire.begin();
 //  TWBR = 12;  // 400 kbit/sec I2C speed
   Serial.begin(115200);
-
-  pinMode(PA0, OUTPUT);
-  pinMode(PA1, OUTPUT);
-  pinMode(PA2, OUTPUT);
-  pinMode(PA3, OUTPUT);
-  pinMode(PA4, OUTPUT);
 
   
   // Set up the interrupt pin, its set as active high, push-pull
