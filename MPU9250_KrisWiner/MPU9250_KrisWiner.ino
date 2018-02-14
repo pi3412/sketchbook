@@ -31,12 +31,13 @@
 #include <Adafruit_PCD8544.h>
 
 // Using NOKIA 5110 monochrome 84 x 48 pixel display
-// pin 9 - Serial clock out (SCLK)
-// pin 8 - Serial data out (DIN)
-// pin 7 - Data/Command select (D/C)
-// pin 5 - LCD chip select (CS)
-// pin 6 - LCD reset (RST)
-Adafruit_PCD8544 display = Adafruit_PCD8544(9, 8, 7, 5, 6);
+// Software SPI (slower updates, more flexible pin options):
+// pin PA4 - Serial clock out (SCLK)
+// pin PA3 - Serial data out (DIN)
+// pin PA2 - Data/Command select (D/C)
+// pin PA1 - LCD chip select (CS)
+// pin PA0 - LCD reset (RST)
+Adafruit_PCD8544 display = Adafruit_PCD8544(PA4, PA3, PA2, PA1, PA0);
 
 // See also MPU-9250 Register Map and Descriptions, Revision 4.0, RM-MPU-9250A-00, Rev. 1.4, 9/9/2013 for registers not listed in 
 // above document; the MPU9250 and MPU9150 are virtually identical but the latter has a different register map
@@ -272,7 +273,14 @@ void setup()
 {
   Wire.begin();
 //  TWBR = 12;  // 400 kbit/sec I2C speed
-  Serial.begin(38400);
+  Serial.begin(115200);
+
+  pinMode(PA0, OUTPUT);
+  pinMode(PA1, OUTPUT);
+  pinMode(PA2, OUTPUT);
+  pinMode(PA3, OUTPUT);
+  pinMode(PA4, OUTPUT);
+
   
   // Set up the interrupt pin, its set as active high, push-pull
   pinMode(intPin, INPUT);
