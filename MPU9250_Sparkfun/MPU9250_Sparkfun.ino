@@ -54,13 +54,11 @@ void setup()
   // TWBR = 12;  // 400 kbit/sec I2C speed
   Serial.begin(115200);
   
-  pinMode(PC13, OUTPUT);
-
   // Set up the interrupt pin, its set as active high, push-pull
   pinMode(intPin, INPUT);
   digitalWrite(intPin, LOW);
   pinMode(myLed, OUTPUT);
-  digitalWrite(myLed, HIGH);
+  digitalWrite(myLed, LOW);
 
 /* #ifdef LCD
   display.begin(); // Ini8ialize the display
@@ -98,7 +96,8 @@ void setup()
   delay(1000);
 #endif // LCD */
 
-  if (c == 0x71) // WHO_AM_I should always be 0x68
+//  if (c == 0x71) // WHO_AM_I should always be 0x68
+  if (c == 0x73) // Test mit der gefundenen Adresse
   {
     Serial.print("MPU9250 is online...\r\n");
 
@@ -201,7 +200,7 @@ void setup()
 
 void loop()
 {
-    digitalWrite(PC13, HIGH);   // turn the LED on (HIGH is the voltage level)
+    digitalWrite(myLed, HIGH);   // turn the LED on (HIGH is the voltage level)
 
   // If intPin goes high, all data registers have new data
   // On interrupt, check if data ready interrupt
@@ -263,7 +262,7 @@ void loop()
                          myIMU.gy*DEG_TO_RAD, myIMU.gz*DEG_TO_RAD, myIMU.my,
                          myIMU.mx, myIMU.mz, myIMU.deltat);
 
- /* if (!AHRS)
+if (!AHRS)
   {
     myIMU.delt_t = millis() - myIMU.count;
     if (myIMU.delt_t > 500)
@@ -302,7 +301,7 @@ void loop()
         Serial.println(" degrees C");
       }
 
-#ifdef LCD
+/* #ifdef LCD
       display.clearDisplay();
       display.setCursor(0, 0); display.print("MPU9250/AK8963");
       display.setCursor(0, 8); display.print(" x   y   z  ");
@@ -326,7 +325,7 @@ void loop()
       display.setCursor(50,  40); display.print(myIMU.temperature, 1);
       display.print(" C");
       display.display();
-#endif // LCD
+#endif // LCD */
 
       myIMU.count = millis();
       digitalWrite(myLed, !digitalRead(myLed));  // toggle led
@@ -409,7 +408,7 @@ void loop()
         Serial.println(" Hz");
       }
 
-#ifdef LCD
+/* #ifdef LCD
       display.clearDisplay();
 
       display.setCursor(0, 0); display.print(" x   y   z  ");
@@ -453,12 +452,12 @@ void loop()
       display.print((float) myIMU.sumCount / myIMU.sum, 2);
       display.print(" Hz");
       display.display();
-#endif // LCD
+#endif // LCD */
 
       myIMU.count = millis();
       myIMU.sumCount = 0;
       myIMU.sum = 0;
     } // if (myIMU.delt_t > 500)
-  } // if (AHRS) */
+  } // if (AHRS)
 }
 
