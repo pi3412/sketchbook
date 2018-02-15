@@ -26,71 +26,30 @@ All text above, and the splash screen must be included in any redistribution
 // pin 5 - Data/Command select (D/C)
 // pin 4 - LCD chip select (CS)
 // pin 3 - LCD reset (RST)
-//Adafruit_PCD8544 display = Adafruit_PCD8544(7, 6, 5, 4, 3);
+#if defined (__STM32F1__)
+  Adafruit_PCD8544 display = Adafruit_PCD8544(PA0, PA1, PA2, PA3, PA4);
+#else
+  Adafruit_PCD8544 display = Adafruit_PCD8544(7, 6, 5, 4, 3);
+#endif
 
 // Hardware SPI (faster, but must use certain hardware pins):
 // SCK is LCD serial clock (SCLK) - this is pin 13 on Arduino Uno
 // MOSI is LCD DIN - this is pin 11 on an Arduino Uno
 // pin 5 - Data/Command select (D/C)
-// pin 15 - LCD chip select (CS)
-// pin 4 - LCD reset (RST)
-Adafruit_PCD8544 display = Adafruit_PCD8544(5, 15, 4);
+// pin 4 - LCD chip select (CS)
+// pin 3 - LCD reset (RST)
+//
+// For the STM32F1:
+//   MOSI - on pin PA7 (Maple Mini: also known as pin 4)
+//   SCK  - on pin PA5 (Maple Mini: also known as pin 6)
+//
+//#if defined (__STM32F1__)
+//  Adafruit_PCD8544 display = Adafruit_PCD8544(PA2, PA3, PA4);
+//#else
+// Adafruit_PCD8544 display = Adafruit_PCD8544(5, 4, 3);
+//#endif
 // Note with hardware SPI MISO and SS pins aren't used but will still be read
 // and written to during SPI transfer.  Be careful sharing these pins!
-
-/******************************************************************
-ESP8266 with PCD8544 display
-
-== Parts ==
-
-* Adafruit Huzzah ESP8266 https://www.adafruit.com/products/2471
-
-* Adafruit PCD8544/5110 display https://www.adafruit.com/product/338
-
-* Adafruit USB to TTL serial cable https://www.adafruit.com/products/954
-
-== Connection ==
-
-USB TTL     Huzzah      Nokia 5110  Description
-            ESP8266     PCD8544
-
-            GND         GND         Ground
-            3V          VCC         3.3V from Huzzah to display
-            14          CLK         Output from ESP SPI clock
-            13          DIN         Output from ESP SPI MOSI to display data input
-            12          D/C         Output from display data/command to ESP
-            #5          CS          Output from ESP to chip select/enable display
-            #4          RST         Output from ESP to reset display
-                        LED         3.3V to turn backlight on
-
-GND (blk)   GND                     Ground
-5V  (red)   V+                      5V power from PC or charger
-TX  (green) RX                      Serial data from IDE to ESP
-RX  (white) TX                      Serial data to ESP from IDE
-******************************************************************/
-
-// ESP8266 Software SPI (slower updates, more flexible pin options):
-// pin 14 - Serial clock out (SCLK)
-// pin 13 - Serial data out (DIN)
-// pin 12 - Data/Command select (D/C)
-// pin 5 - LCD chip select (CS)
-// pin 4 - LCD reset (RST)
-//Adafruit_PCD8544 display = Adafruit_PCD8544(14, 13, 12, 5, 4);
-
-// If using an ESP8266, use this option. Comment out the other options.
-// ESP8266 Hardware SPI (faster, but must use certain hardware pins):
-// SCK is LCD serial clock (SCLK) - this is pin 14 on Huzzah ESP8266
-// MOSI is LCD DIN - this is pin 13 on an Huzzah ESP8266
-// pin 12 - Data/Command select (D/C) on an Huzzah ESP8266
-// pin 5 - LCD chip select (CS)
-// pin 4 - LCD reset (RST)
-//Adafruit_PCD8544 display = Adafruit_PCD8544(12, 5, 4);
-
-// ESP32 hardware-SPI
-// pin 17 - Data/Command select (D/C)
-// pin 5 - LCD chip select (CS)
-// pin 16 - LCD reset (RST)
-//Adafruit_PCD8544 display = Adafruit_PCD8544(17, 5, 16);
 
 #define NUMFLAKES 10
 #define XPOS 0
