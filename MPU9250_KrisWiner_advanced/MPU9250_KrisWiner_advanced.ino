@@ -323,22 +323,6 @@ void setup()
     Serial.println("accel biases (mg)"); Serial.println(1000.*accelBias[0]); Serial.println(1000.*accelBias[1]); Serial.println(1000.*accelBias[2]);
     Serial.println("gyro biases (dps)"); Serial.println(gyroBias[0]); Serial.println(gyroBias[1]); Serial.println(gyroBias[2]);
 
-    Serial.print("MPU9250 bias   x   y   z  \r\n");
-    Serial.print((int)(1000 * accelBias[0]));
-    Serial.print("   ");
-    Serial.print((int)(1000 * accelBias[1]));
-    Serial.print("   ");
-    Serial.print((int)(1000 * accelBias[2]));
-    Serial.print(" mg\r\n");
-    Serial.print(gyroBias[0], 1);
-    Serial.print("   ");
-    Serial.print(gyroBias[1], 1);
-    Serial.print("   ");
-    Serial.print(gyroBias[2], 1);
-    Serial.print(" os\r\n");
-
-    delay(1000);
-
     initMPU9250();
     Serial.println("MPU9250 initialized for active data mode...."); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
 
