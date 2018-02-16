@@ -84,10 +84,10 @@ void MadgwickQuaternionUpdate(float ax, float ay, float az, float gx, float gy, 
   qDot4 = 0.5f * (q1 * gz + q2 * gy - q3 * gx) - beta * s4;
 
   // Integrate to yield quaternion
-  q1 += qDot1 * deltat;
-  q2 += qDot2 * deltat;
-  q3 += qDot3 * deltat;
-  q4 += qDot4 * deltat;
+  q1 += qDot1 * deltat_filter;
+  q2 += qDot2 * deltat_filter;
+  q3 += qDot3 * deltat_filter;
+  q4 += qDot4 * deltat_filter;
   norm = sqrtf(q1 * q1 + q2 * q2 + q3 * q3 + q4 * q4);    // normalise quaternion
   norm = 1.0f / norm;
   q[0] = q1 * norm;
@@ -178,10 +178,10 @@ void MahonyQuaternionUpdate(float ax, float ay, float az, float gx, float gy, fl
   pa = q2;
   pb = q3;
   pc = q4;
-  q1 = q1 + (-q2 * gx - q3 * gy - q4 * gz) * (0.5f * deltat);
-  q2 = pa + (q1 * gx + pb * gz - pc * gy) * (0.5f * deltat);
-  q3 = pb + (q1 * gy - pa * gz + pc * gx) * (0.5f * deltat);
-  q4 = pc + (q1 * gz + pa * gy - pb * gx) * (0.5f * deltat);
+  q1 = q1 + (-q2 * gx - q3 * gy - q4 * gz) * (0.5f * deltat_filter);
+  q2 = pa + (q1 * gx + pb * gz - pc * gy) * (0.5f * deltat_filter);
+  q3 = pb + (q1 * gy - pa * gz + pc * gx) * (0.5f * deltat_filter);
+  q4 = pc + (q1 * gz + pa * gy - pb * gx) * (0.5f * deltat_filter);
 
   // Normalise quaternion
   norm = sqrtf(q1 * q1 + q2 * q2 + q3 * q3 + q4 * q4);
