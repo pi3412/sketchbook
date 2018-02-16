@@ -192,7 +192,7 @@
 #define AK8963_ADDRESS 0x0C   //  Address of magnetometer
 // #define MS5637_ADDRESS 0x76   // Address of altimeter
 
-#define SerialDebug true  // set to true to get Serial output for debugging
+#define SerialDebug false  // set to true to get Serial output for debugging
 
 // Set initial input parameters
 enum Ascale {
@@ -424,7 +424,7 @@ void loop()
       my *= magScale[1];
       mz *= magScale[2];
     }
- }
+  }
 
   Now = micros();
   deltat_filter = ((Now - lastUpdate_filter) / 1000000.0f); // set integration time by time elapsed since last filter update
@@ -442,12 +442,15 @@ void loop()
   // function to get North along the accel +x-axis, East along the accel -y-axis, and Down along the accel -z-axis.
   // This orientation choice can be modified to allow any convenient (non-NED) orientation convention.
   // Pass gyro rate as rad/s
-  MadgwickQuaternionUpdate(-ax, ay, az, gx * PI / 180.0f, -gy * PI / 180.0f, -gz * PI / 180.0f,  my,  -mx, mz);
-  //  MahonyQuaternionUpdate(-ax, ay, az, gx*PI/180.0f, -gy*PI/180.0f, -gz*PI/180.0f,  my,  -mx, mz);
- 
+  // MadgwickQuaternionUpdate(-ax, ay, az, gx * PI / 180.0f, -gy * PI / 180.0f, -gz * PI / 180.0f,  my,  -mx, mz);
+  MahonyQuaternionUpdate(-ax, ay, az, gx * PI / 180.0f, -gy * PI / 180.0f, -gz * PI / 180.0f,  my,  -mx, mz);
+
   // Serial print and/or display at 0.5 s rate independent of data rates
   delt_t = millis() - count;
   if (delt_t > 500) { // output once per half-second independent of read rate
+    Serial.print("RawMag, "); Serial.print((float)magCount[0] * mRes);
+    Serial.print(", "); Serial.print((float)magCount[1] * mRes);
+    Serial.print(", "); Serial.println((float)magCount[2] * mRes);
 
     if (SerialDebug) {
       Serial.print("ax = "); Serial.print((int)1000 * ax);
