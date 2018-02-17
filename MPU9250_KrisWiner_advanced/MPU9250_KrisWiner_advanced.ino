@@ -227,7 +227,7 @@ enum Mscale {
 // uint8_t OSR = ADC_8192;     // set pressure amd temperature oversample rate
 uint8_t Gscale = GFS_250DPS;
 uint8_t Ascale = AFS_2G;
-uint8_t Mscale = MFS_16BITS; // Choose either 14-bit or 16-bit magnetometer resolution
+uint8_t Mscale = MFS_14BITS; // Choose either 14-bit or 16-bit magnetometer resolution
 uint8_t Mmode = 0x06;        // 2 for 8 Hz, 6 for 100 Hz continuous magnetometer data read
 float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
 
@@ -278,7 +278,11 @@ float deltat_update = 0.0f, sum_update = 0.0f;          // integration interval 
 uint32_t lastUpdate_update = 0; // used to calculate integration interval
 uint32_t Now = 0;                         // used to calculate integration interval
 
-float ax, ay, az, gx, gy, gz, mx, my, mz; // variables to hold latest sensor data values
+float axn, ayn, azn, gxn, gyn, gzn, mxn, myn, mzn; // variables to hold latest sensor data values
+float ax, ay, az, gx, gy, gz, mx, my, mz; // variables used in filter
+float axs, ays, azs, gxs, gys, gzs, mxs, mys, mzs; // store sensor data for averaging
+int count_avg = 0;                        // storing actual number of averages
+const int max_avg = 8;         // number of cycles over which should be averaged
 float lin_ax, lin_ay, lin_az;             // linear acceleration (acceleration with gravity component subtracted)
 float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};    // vector to hold quaternion
 float eInt[3] = {0.0f, 0.0f, 0.0f};       // vector to hold integral error for Mahony method
@@ -394,22 +398,16 @@ void loop()
   // If INT register goes high, all data registers have new data
   if (readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
     readMPU9250Data(MPU9250Data); // INT cleared on any read
-    Now = micros();
-    deltat_update = ((Now - lastUpdate_update) / 1000000.0f); // set integration time by time elapsed since last filter update
-    lastUpdate_update = Now;
-
-    sum_update += deltat_update; // sum for averaging filter update rate
-    sumCount_update++;
 
     // Now we'll calculate the accleration value into actual g's
-    ax = (float)MPU9250Data[0] * aRes - accelBias[0]; // get actual g value, this depends on scale being set
-    ay = (float)MPU9250Data[1] * aRes - accelBias[1];
-    az = (float)MPU9250Data[2] * aRes - accelBias[2];
+    axn = (float)MPU9250Data[0] * aRes - accelBias[0]; // get actual g value, this depends on scale being set
+    ayn = (float)MPU9250Data[1] * aRes - accelBias[1];
+    azn = (float)MPU9250Data[2] * aRes - accelBias[2];
 
     // Calculate the gyro value into actual degrees per second
-    gx = (float)MPU9250Data[4] * gRes; // get actual gyro value, this depends on scale being set
-    gy = (float)MPU9250Data[5] * gRes;
-    gz = (float)MPU9250Data[6] * gRes;
+    gxn = (float)MPU9250Data[4] * gRes; // get actual gyro value, this depends on scale being set
+    gyn = (float)MPU9250Data[5] * gRes;
+    gzn = (float)MPU9250Data[6] * gRes;
 
     readMagData(magCount);  // Read the x/y/z adc values
 
@@ -417,12 +415,61 @@ void loop()
     // Include factory calibration per data sheet and user environmental corrections
     if (newMagData == true) {
       newMagData = false; // reset newMagData flag
-      mx = (float)magCount[0] * mRes * magCalibration[0] - magBias[0]; // get actual magnetometer value, this depends on scale being set
-      my = (float)magCount[1] * mRes * magCalibration[1] - magBias[1];
-      mz = (float)magCount[2] * mRes * magCalibration[2] - magBias[2];
-      mx *= magScale[0];
-      my *= magScale[1];
-      mz *= magScale[2];
+      mxn = (float)magCount[0] * mRes * magCalibration[0] - magBias[0]; // get actual magnetometer value, this depends on scale being set
+      myn = (float)magCount[1] * mRes * magCalibration[1] - magBias[1];
+      mzn = (float)magCount[2] * mRes * magCalibration[2] - magBias[2];
+      mxn *= magScale[0];
+      myn *= magScale[1];
+      mzn *= magScale[2];
+    }
+    // Averaging of sensor values
+    if (count_avg < (max_avg - 1)) { // Just store data for averaging
+      axs += axn;
+      ays += ayn;
+      azs += azn;
+      gxs += gxn;
+      gys += gyn;
+      gzs += gzn;
+      mxs += mxn;
+      mys += myn;
+      mzs += mzn;
+      ++count_avg;
+    } else { // Process and output average data
+      axs += axn;
+      ays += ayn;
+      azs += azn;
+      gxs += gxn;
+      gys += gyn;
+      gzs += gzn;
+      mxs += mxn;
+      mys += myn;
+      mzs += mzn;
+      ax = axs / max_avg;
+      ay = ays / max_avg;
+      az = azs / max_avg;
+      gx = gxs / max_avg;
+      gy = gys / max_avg;
+      gz = gzs / max_avg;
+      mx = mxs / max_avg;
+      my = mys / max_avg;
+      mz = mzs / max_avg;
+      axs = 0;
+      ays = 0;
+      azs = 0;
+      gxs = 0;
+      gys = 0;
+      gzs = 0;
+      mxs = 0;
+      mys = 0;
+      mzs = 0;
+      count_avg = 0;
+      
+      Now = micros();
+      deltat_update = ((Now - lastUpdate_update) / 1000000.0f); // set integration time by time elapsed since last filter update
+      lastUpdate_update = Now;
+
+      sum_update += deltat_update; // sum for averaging filter update rate
+      sumCount_update++;
     }
   }
 
@@ -451,6 +498,9 @@ void loop()
     Serial.print("RawMag, "); Serial.print((float)magCount[0] * mRes);
     Serial.print(", "); Serial.print((float)magCount[1] * mRes);
     Serial.print(", "); Serial.println((float)magCount[2] * mRes);
+    Serial.print("CalMag, "); Serial.print(mxn);
+    Serial.print(", "); Serial.print(myn);
+    Serial.print(", "); Serial.println(mzn);
 
     if (SerialDebug) {
       Serial.print("ax = "); Serial.print((int)1000 * ax);
