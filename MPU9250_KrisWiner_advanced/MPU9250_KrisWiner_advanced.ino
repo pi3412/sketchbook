@@ -247,7 +247,7 @@ int16_t accelCount[3];  // Stores the 16-bit signed accelerometer sensor output
 int16_t gyroCount[3];   // Stores the 16-bit signed gyro sensor output
 int16_t magCount[3];    // Stores the 16-bit signed magnetometer sensor output
 float magCalibration[3] = {0, 0, 0};  // Factory mag calibration and mag bias
-float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0}, magBias[3] = {0, 0, 0}, magScale[3]  = {0, 0, 0};      // Bias corrections for gyro and accelerometer
+float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0};      // Bias corrections for gyro and accelerometer
 int16_t tempCount;            // temperature raw count output
 float   temperature;          // Stores the MPU9250 gyro internal chip temperature in degrees Celsius
 // double Temperature, Pressure; // stores MS5637 pressures sensor pressure and temperature
@@ -281,8 +281,9 @@ uint32_t Now = 0;                         // used to calculate integration inter
 float axn, ayn, azn, gxn, gyn, gzn, mxn, myn, mzn; // variables to hold latest sensor data values
 float ax, ay, az, gx, gy, gz, mx, my, mz; // variables used in filter
 float axs, ays, azs, gxs, gys, gzs, mxs, mys, mzs; // store sensor data for averaging
+float mxt, myt, mzt; // store temporarysensor data
 int count_avg = 0;                        // storing actual number of averages
-const int max_avg = 8;         // number of cycles over which should be averaged
+const int max_avg = 1;         // number of cycles over which should be averaged
 float lin_ax, lin_ay, lin_az;             // linear acceleration (acceleration with gravity component subtracted)
 float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};    // vector to hold quaternion
 float eInt[3] = {0.0f, 0.0f, 0.0f};       // vector to hold integral error for Mahony method
@@ -292,7 +293,7 @@ void setup()
 {
   Wire.begin();
   Serial.begin(115200);
-
+  delay(2000);
   pinMode(myLed, OUTPUT);
   digitalWrite(myLed, HIGH);
 
@@ -344,12 +345,6 @@ void setup()
     initAK8963(magCalibration); Serial.println("AK8963 initialized for active data mode...."); // Initialize device for active mode read of magnetometer
     delay(1000);
     digitalWrite(myLed, LOW);
-
-    magcalMPU9250(magBias, magScale);
-    Serial.println("AK8963 mag biases (mG)"); Serial.println(magBias[0]); Serial.println(magBias[1]); Serial.println(magBias[2]);
-    Serial.println("AK8963 mag scale (mG)"); Serial.println(magScale[0]); Serial.println(magScale[1]); Serial.println(magScale[2]);
-    delay(1000); // add delay to see results before serial spew of data
-    digitalWrite(myLed, HIGH);
 
     //  Serial.println("Calibration values: ");
     Serial.print("X-Axis sensitivity adjustment value "); Serial.println(magCalibration[0], 2);
@@ -415,12 +410,12 @@ void loop()
     // Include factory calibration per data sheet and user environmental corrections
     if (newMagData == true) {
       newMagData = false; // reset newMagData flag
-      mxn = (float)magCount[0] * mRes * magCalibration[0] - magBias[0]; // get actual magnetometer value, this depends on scale being set
-      myn = (float)magCount[1] * mRes * magCalibration[1] - magBias[1];
-      mzn = (float)magCount[2] * mRes * magCalibration[2] - magBias[2];
-      mxn *= magScale[0];
-      myn *= magScale[1];
-      mzn *= magScale[2];
+      mxt = (float)magCount[0] * mRes * magCalibration[0] - 26.767658;  // values from magneto 1.2 calibration calculation
+      myt = (float)magCount[1] * mRes * magCalibration[1] - 185.564642;
+      mzt = (float)magCount[2] * mRes * magCalibration[2] + 259.649473;
+      mxn = 1.547708 * mxt + 0.015255 * myt + 0.079606 * mzt;  // values from magneto 1.2 calibration calculation
+      myn = 0.015255 * mxt + 1.498229 * myt - 0.131361 * mzt;
+      mzn = 0.079606 * mxt - 0.131361 * myt + 1.466734 * mzt;
     }
     // Averaging of sensor values
     if (count_avg < (max_avg - 1)) { // Just store data for averaging
@@ -463,7 +458,7 @@ void loop()
       mys = 0;
       mzs = 0;
       count_avg = 0;
-      
+
       Now = micros();
       deltat_update = ((Now - lastUpdate_update) / 1000000.0f); // set integration time by time elapsed since last filter update
       lastUpdate_update = Now;
@@ -495,7 +490,8 @@ void loop()
   // Serial print and/or display at 0.5 s rate independent of data rates
   delt_t = millis() - count;
   if (delt_t > 500) { // output once per half-second independent of read rate
-    Serial.print("RawMag, "); Serial.print((float)magCount[0] * mRes);
+    Serial.print("RawMag, ");
+    Serial.print((float)magCount[0] * mRes);
     Serial.print(", "); Serial.print((float)magCount[1] * mRes);
     Serial.print(", "); Serial.println((float)magCount[2] * mRes);
     Serial.print("CalMag, "); Serial.print(mxn);
@@ -616,13 +612,9 @@ void loop()
     lin_ax = ax + a31;
     lin_ay = ay + a32;
     lin_az = az - a33;
-    //    Serial.print("Yaw, Pitch, Roll: ");
-    Serial.print("YPR, ");
-    Serial.print(yaw, 2);
-    Serial.print(", ");
-    Serial.print(pitch, 2);
-    Serial.print(", ");
-    Serial.println(roll, 2);
+    Serial.print("YPR, "); Serial.print(yaw, 2);
+    Serial.print(", "); Serial.print(pitch, 2);    // These are the important ones!!!!
+    Serial.print(", "); Serial.println(roll, 2);
     if (SerialDebug) {
       Serial.print("Grav_x, Grav_y, Grav_z: ");
       Serial.print(-a31 * 1000, 2);
@@ -990,58 +982,6 @@ void accelgyrocalMPU9250(float * dest1, float * dest2)
   dest2[1] = (float)accel_bias[1] / (float)accelsensitivity;
   dest2[2] = (float)accel_bias[2] / (float)accelsensitivity;
 }
-
-
-void magcalMPU9250(float * dest1, float * dest2)
-{
-  uint16_t ii = 0, sample_count = 0;
-  int32_t mag_bias[3] = {0, 0, 0}, mag_scale[3] = {0, 0, 0};
-  int16_t mag_max[3] = { -32767, -32767, -32767}, mag_min[3] = {32767, 32767, 32767}, mag_temp[3] = {0, 0, 0};
-
-  Serial.println("Mag Calibration: Wave device in a figure eight until done!");
-  delay(4000);
-
-  // shoot for ~fifteen seconds of mag data
-  if (Mmode == 0x02) sample_count = 128; // at 8 Hz ODR, new mag data is available every 125 ms
-  if (Mmode == 0x06) sample_count = 1500; // at 100 Hz ODR, new mag data is available every 10 ms
-  for (ii = 0; ii < sample_count; ii++) {
-    readMagData(mag_temp);  // Read the mag data
-    for (int jj = 0; jj < 3; jj++) {
-      if (mag_temp[jj] > mag_max[jj]) mag_max[jj] = mag_temp[jj];
-      if (mag_temp[jj] < mag_min[jj]) mag_min[jj] = mag_temp[jj];
-    }
-    if (Mmode == 0x02) delay(135); // at 8 Hz ODR, new mag data is available every 125 ms
-    if (Mmode == 0x06) delay(12); // at 100 Hz ODR, new mag data is available every 10 ms
-  }
-
-  //    Serial.println("mag x min/max:"); Serial.println(mag_max[0]); Serial.println(mag_min[0]);
-  //    Serial.println("mag y min/max:"); Serial.println(mag_max[1]); Serial.println(mag_min[1]);
-  //    Serial.println("mag z min/max:"); Serial.println(mag_max[2]); Serial.println(mag_min[2]);
-
-  // Get hard iron correction
-  mag_bias[0]  = (mag_max[0] + mag_min[0]) / 2; // get average x mag bias in counts
-  mag_bias[1]  = (mag_max[1] + mag_min[1]) / 2; // get average y mag bias in counts
-  mag_bias[2]  = (mag_max[2] + mag_min[2]) / 2; // get average z mag bias in counts
-
-  dest1[0] = (float) mag_bias[0] * mRes * magCalibration[0]; // save mag biases in G for main program
-  dest1[1] = (float) mag_bias[1] * mRes * magCalibration[1];
-  dest1[2] = (float) mag_bias[2] * mRes * magCalibration[2];
-
-  // Get soft iron correction estimate
-  mag_scale[0]  = (mag_max[0] - mag_min[0]) / 2; // get average x axis max chord length in counts
-  mag_scale[1]  = (mag_max[1] - mag_min[1]) / 2; // get average y axis max chord length in counts
-  mag_scale[2]  = (mag_max[2] - mag_min[2]) / 2; // get average z axis max chord length in counts
-
-  float avg_rad = mag_scale[0] + mag_scale[1] + mag_scale[2];
-  avg_rad /= 3.0;
-
-  dest2[0] = avg_rad / ((float)mag_scale[0]);
-  dest2[1] = avg_rad / ((float)mag_scale[1]);
-  dest2[2] = avg_rad / ((float)mag_scale[2]);
-
-  Serial.println("Mag Calibration done!");
-}
-
 
 
 // Accelerometer and gyroscope self test; check calibration wrt factory settings
