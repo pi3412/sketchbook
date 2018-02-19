@@ -205,11 +205,11 @@ float SelfTest[6];            // holds results of gyro and accelerometer self te
 float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
 
 float phi, theta, radius; // Data preparation for collecting magnet calibration data
-int band, zone, maxZonen;
+int band, zone;
 int zonesInBand[16] = {1, 6, 12, 18, 24, 24, 30, 30, 30, 30, 24, 24, 18, 12, 6, 1} //Zones per Band in a Tregenza Dome
 int cumulZones[16] = {0, 1, 7, 19, 37, 61, 85, 115, 145, 175, 205, 229, 253, 271, 283, 289}
 float magCalData[290]; // Magnet calibration data
-uint32_t  magCalNumber[290]; // Magnet calibration number of data samples
+uint32_t  magCalNumber[290] = {0}; // Magnet calibration number of data samples
 
 uint32_t delt_t = 0, count = 0, sumCount_filter = 0, sumCount_update = 0;  // used to control display output rate
 float pitch, yaw, roll;
@@ -255,6 +255,7 @@ float MAGSMOOTH = 0.5f;    // [0, 0.99] 0 = no smoothing, 0.99 very strong smoot
 
 void setup()
 {
+  //memset(magCalNumber[], 0, sizeof(magCalNumber[]));
   Wire.begin();
   Serial.begin(115200);
   pinMode(myLed, OUTPUT);
@@ -357,16 +358,12 @@ void loop() {
     phi = acos(mzt / radius) * 180.0f / PI
       
     band = (int)round(theta/12)
+    zone = cumulZones[band] + (int)(phi*zonesInBand[band]/360);
+    magCalData[zone] = magCalData[zone] + radius; // adding current measurement to data pool
+    ++magCalNumber[zone]; // increasing number of data samples
+  
       
-            switch (band) {
-            case 0:
-              zone = 0;
-              break;
-           case 1:
-              maxZone = 6;
-              zone = 1 + (int)(phi*maxZone/360);
-              break;
-                }
+
       
     }
     Now = micros();
