@@ -4,39 +4,15 @@
   license: Beerware - Use this code however you'd like. If you
   find it useful you can buy me a beer some time.
 
-  Demonstrate basic MPU-9250 functionality including parameterizing the register addresses, initializing the sensor,
-  getting properly scaled accelerometer, gyroscope, and magnetometer data out. Added display functions to
-  allow display to on breadboard monitor. Addition of 9 DoF sensor fusion using open source Madgwick and
-  Mahony filter algorithms. Sketch runs on the 3.3 V 8 MHz Pro Mini and the Teensy 3.1.
-
-  This sketch is intended specifically for the MPU9250+MS5637 Add-on shield for the Teensy 3.1.
-  It uses SDA/SCL on pins 17/16, respectively, and it uses the Teensy 3.1-specific Wire library i2c_t3.h.
-  The MS5637 is a simple but high resolution pressure sensor, which can be used in its high resolution
-  mode but with power consumption of 20 microAmp, or in a lower resolution mode with power consumption of
-  only 1 microAmp. The choice will depend on the application.
-
-  SDA and SCL should have external pull-up resistors (to 3.3V).
-  4K7 resistors are on the MPU9250+MS5637 breakout board.
-
   Hardware setup:
   MPU9250 Breakout --------- STM32
   VDD ---------------------- 3.3V
   SDA ---------------------- PB7
   SCL ---------------------- PB6
-  GND ---------------------- GND
+  GND ---------------------- GND */
 
-  Note: The MPU9250 is an I2C sensor and uses the Arduino Wire library.
-  Because the sensor is not 5V tolerant, we are using a 3.3 V 8 MHz Pro Mini or a 3.3 V Teensy 3.1.
-  We have disabled the internal pull-ups used by the Wire library in the Wire.h/twi.c utility file.
-  We are also using the 400 kHz fast I2C mode by setting the TWI_FREQ  to 400000L /twi.h utility file.
-*/
 #include "Wire.h"
 
-/* See MS5637-02BA03 Low Voltage Barometric Pressure Sensor Data Sheet
-  #define MS5637_RESET      0x1E
-  #define MS5637_CONVERT_D1 0x40
-  #define MS5637_CONVERT_D2 0x50
-  #define MS5637_ADC_READ   0x00 */
 
 // See also MPU-9250 Register Map and Descriptions, Revision 4.0, RM-MPU-9250A-00, Rev. 1.4, 9/9/2013 for registers not listed in
 // above document; the MPU9250 and MPU9150 are virtually identical but the latter has a different register map
@@ -190,9 +166,6 @@
 
 #define MPU9250_ADDRESS 0x68  // Device address
 #define AK8963_ADDRESS 0x0C   //  Address of magnetometer
-// #define MS5637_ADDRESS 0x76   // Address of altimeter
-
-#define SerialDebug false  // set to true to get Serial output for debugging
 
 // Set initial input parameters
 enum Ascale {
@@ -214,34 +187,12 @@ enum Mscale {
   MFS_16BITS      // 0.15 mG per LSB
 };
 
-/* #define ADC_256  0x00 // define pressure and temperature conversion rates
-  #define ADC_512  0x02
-  #define ADC_1024 0x04
-  #define ADC_2048 0x06
-  #define ADC_4096 0x08
-  #define ADC_8192 0x0A
-  #define ADC_D1   0x40
-  #define ADC_D2   0x50 */
-
-// Specify sensor full scale
-// uint8_t OSR = ADC_8192;     // set pressure amd temperature oversample rate
-uint8_t Gscale = GFS_250DPS;
-uint8_t Ascale = AFS_2G;
-uint8_t Mscale = MFS_14BITS; // Choose either 14-bit or 16-bit magnetometer resolution
-uint8_t Mmode = 0x06;        // 2 for 8 Hz, 6 for 100 Hz continuous magnetometer data read
-float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
-
 // Dtate definitions
 bool newMagData = false;
 
 // Pin definitions
 int myLed = PC13;  // STMF103 blue pill onboard LED
 
-/*uint16_t Pcal[8];         // calibration constants from MS5637 PROM registers
-  unsigned char nCRC;       // calculated check sum to ensure PROM integrity
-  uint32_t D1 = 0, D2 = 0;  // raw MS5637 pressure and temperature data
-  double dT, OFFSET, SENS, T2, OFFSET2, SENS2;  // First order and second order corrections for raw S5637 temperature and pressure data
-*/
 int16_t MPU9250Data[7]; // used to read all 14 bytes at once from the MPU9250 accel/gyro
 int16_t accelCount[3];  // Stores the 16-bit signed accelerometer sensor output
 int16_t gyroCount[3];   // Stores the 16-bit signed gyro sensor output
@@ -250,24 +201,8 @@ float magCalibration[3] = {0, 0, 0};  // Factory mag calibration and mag bias
 float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0};      // Bias corrections for gyro and accelerometer
 int16_t tempCount;            // temperature raw count output
 float   temperature;          // Stores the MPU9250 gyro internal chip temperature in degrees Celsius
-// double Temperature, Pressure; // stores MS5637 pressures sensor pressure and temperature
 float SelfTest[6];            // holds results of gyro and accelerometer self test
-
-// global constants for 9 DoF fusion and AHRS (Attitude and Heading Reference System)
-float GyroMeasError = PI * (4.0f / 180.0f);   // gyroscope measurement error in rads/s (start at 40 deg/s)
-float GyroMeasDrift = PI * (0.0f  / 180.0f);   // gyroscope measurement drift in rad/s/s (start at 0.0 deg/s/s)
-// There is a tradeoff in the beta parameter between accuracy and response speed.
-// In the original Madgwick study, beta of 0.041 (corresponding to GyroMeasError of 2.7 degrees/s) was found to give optimal accuracy.
-// However, with this value, the LSM9SD0 response time is about 10 seconds to a stable initial quaternion.
-// Subsequent changes also require a longish lag time to a stable output, not fast enough for a quadcopter or robot car!
-// By increasing beta (GyroMeasError) by about a factor of fifteen, the response time constant is reduced to ~2 sec
-// I haven't noticed any reduction in solution accuracy. This is essentially the I coefficient in a PID control sense;
-// the bigger the feedback coefficient, the faster the solution converges, usually at the expense of accuracy.
-// In any case, this is the free parameter in the Madgwick filtering and fusion scheme.
-float beta = sqrt(3.0f / 4.0f) * GyroMeasError;   // compute beta
-float zeta = sqrt(3.0f / 4.0f) * GyroMeasDrift;   // compute zeta, the other free parameter in the Madgwick scheme usually set to a small or zero value
-#define Kp 2.0f * 5.0f // these are the free parameters in the Mahony filter and fusion scheme, Kp for proportional feedback, Ki for integral
-#define Ki 0.0f
+float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
 
 uint32_t delt_t = 0, count = 0, sumCount_filter = 0, sumCount_update = 0;  // used to control display output rate
 float pitch, yaw, roll;
@@ -278,23 +213,46 @@ float deltat_update = 0.0f, sum_update = 0.0f;          // integration interval 
 uint32_t lastUpdate_update = 0; // used to calculate integration interval
 uint32_t Now = 0;                         // used to calculate integration interval
 
-float axn, ayn, azn, gxn, gyn, gzn, mxn, myn, mzn; // variables to hold latest sensor data values
 float ax, ay, az, gx, gy, gz, mx, my, mz; // variables used in filter
-float axs, ays, azs, gxs, gys, gzs, mxs, mys, mzs; // store sensor data for averaging
-float mxt, myt, mzt; // store temporarysensor data
-int count_avg = 0;                        // storing actual number of averages
-const int max_avg = 1;         // number of cycles over which should be averaged
+float mxs, mys, mzs, mxt, myt, mzt, mxn, myn, mzn; // store sensor data for averaging
 float lin_ax, lin_ay, lin_az;             // linear acceleration (acceleration with gravity component subtracted)
 float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};    // vector to hold quaternion
 float eInt[3] = {0.0f, 0.0f, 0.0f};       // vector to hold integral error for Mahony method
 
+// global constants for 9 DoF fusion and AHRS (Attitude and Heading Reference System)
+float GyroMeasError = PI * (2.0f / 180.0f);   // gyroscope measurement error in rads/s (start at 40 deg/s)
+float GyroMeasDrift = PI * (-1.0f  / 180.0f);   // gyroscope measurement drift in rad/s/s (start at 0.0 deg/s/s)
+// There is a tradeoff in the beta parameter between accuracy and response speed.
+// In the original Madgwick study, beta of 0.041 (corresponding to GyroMeasError of 2.7 degrees/s) was found to give optimal accuracy.
+// However, with this value, the LSM9SD0 response time is about 10 seconds to a stable initial quaternion.
+// Subsequent changes also require a longish lag time to a stable output, not fast enough for a quadcopter or robot car!
+// By increasing beta (GyroMeasError) by about a factor of fifteen, the response time constant is reduced to ~2 sec
+// I haven't noticed any reduction in solution accuracy. This is essentially the I coefficient in a PID control sense;
+// the bigger the feedback coefficient, the faster the solution converges, usually at the expense of accuracy.
+// In any case, this is the free parameter in the Madgwick filtering and fusion scheme.
+float beta = sqrt(3.0f / 4.0f) * GyroMeasError;   // compute beta
+float zeta = sqrt(3.0f / 4.0f) * GyroMeasDrift;   // compute zeta, the other free parameter in the Madgwick scheme usually set to a small or zero value
+#define Kp 10.0f // these are the free parameters in the Mahony filter and fusion scheme, Kp for proportional feedback, Ki for integral
+#define Ki 0.0f
+
+// Specify sensor full scale
+// uint8_t OSR = ADC_8192;     // set pressure amd temperature oversample rate
+uint8_t Gscale = GFS_250DPS;
+uint8_t Ascale = AFS_2G;
+uint8_t Mscale = MFS_16BITS; // Choose either 14-bit or 16-bit magnetometer resolution
+uint8_t Mmode = 0x06;        // 2 for 8 Hz, 6 for 100 Hz continuous magnetometer data read
+
+float MAGSMOOTH = 0.5f;    // [0, 0.99] 0 = no smoothing, 0.99 very strong smoothing
+
+#define SerialDebug false  // set to true to get Serial output for debugging
 
 void setup()
 {
   Wire.begin();
   Serial.begin(115200);
-  delay(2000);
   pinMode(myLed, OUTPUT);
+  digitalWrite(myLed, LOW);
+  delay(2000);
   digitalWrite(myLed, HIGH);
 
   I2Cscan();// look for I2C devices on the bus
@@ -329,17 +287,10 @@ void setup()
     initMPU9250();
     Serial.println("MPU9250 initialized for active data mode...."); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
 
-    /* Read the WHO_AM_I register of the magnetometer, this is a good test of communication
-      byte d = readByte(AK8963_ADDRESS, AK8963_WHO_AM_I);  // Read WHO_AM_I register for AK8963
-      Serial.print("AK8963 "); Serial.print("I AM "); Serial.print(d, HEX); Serial.print(" I should be "); Serial.println(0x48, HEX);
-      display.clearDisplay();
-      display.setCursor(20, 0); display.print("AK8963");
-      display.setCursor(0, 10); display.print("I AM");
-      display.setCursor(0, 20); display.print(d, HEX);
-      display.setCursor(0, 30); display.print("I Should Be");
-      display.setCursor(0, 40); display.print(0x48, HEX);
-      display.display();
-      delay(1000); */
+    // Read the WHO_AM_I register of the magnetometer, this is a good test of communication
+    byte d = readByte(AK8963_ADDRESS, AK8963_WHO_AM_I);  // Read WHO_AM_I register for AK8963
+    Serial.print("AK8963 "); Serial.print("I AM "); Serial.print(d, HEX); Serial.print(" I should be "); Serial.println(0x48, HEX);
+    delay(1000);
 
     // Get magnetometer calibration from AK8963 ROM
     initAK8963(magCalibration); Serial.println("AK8963 initialized for active data mode...."); // Initialize device for active mode read of magnetometer
@@ -351,34 +302,6 @@ void setup()
     Serial.print("Y-Axis sensitivity adjustment value "); Serial.println(magCalibration[1], 2);
     Serial.print("Z-Axis sensitivity adjustment value "); Serial.println(magCalibration[2], 2);
 
-    /* Reset the MS5637 pressure sensor
-      MS5637Reset();
-      delay(100);
-      Serial.println("MS5637 pressure sensor reset...");
-      // Read PROM data from MS5637 pressure sensor
-      MS5637PromRead(Pcal);
-      Serial.println("PROM dta read:");
-      Serial.print("C0 = "); Serial.println(Pcal[0]);
-      unsigned char refCRC = Pcal[0] >> 12;
-      Serial.print("C1 = "); Serial.println(Pcal[1]);
-      Serial.print("C2 = "); Serial.println(Pcal[2]);
-      Serial.print("C3 = "); Serial.println(Pcal[3]);
-      Serial.print("C4 = "); Serial.println(Pcal[4]);
-      Serial.print("C5 = "); Serial.println(Pcal[5]);
-      Serial.print("C6 = "); Serial.println(Pcal[6]);
-
-      nCRC = MS5637checkCRC(Pcal);  //calculate checksum to ensure integrity of MS5637 calibration data
-      Serial.print("Checksum = "); Serial.print(nCRC); Serial.print(" , should be "); Serial.println(refCRC);
-
-      display.clearDisplay();
-      display.setCursor(20, 0); display.print("MS5637");
-      display.setCursor(0, 10); display.print("CRC is "); display.setCursor(50, 10); display.print(nCRC);
-      display.setCursor(0, 20); display.print("Should be "); display.setCursor(50, 30); display.print(refCRC);
-      display.display();
-      delay(1000);*/
-
-    //    attachInterrupt(intPin, myinthandler, RISING);  // define interrupt for INT pin output of MPU9250
-
   }
   else
   {
@@ -388,21 +311,21 @@ void setup()
   }
 }
 
-void loop()
-{
+void loop() {
+
   // If INT register goes high, all data registers have new data
   if (readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
     readMPU9250Data(MPU9250Data); // INT cleared on any read
 
     // Now we'll calculate the accleration value into actual g's
-    axn = (float)MPU9250Data[0] * aRes - accelBias[0]; // get actual g value, this depends on scale being set
-    ayn = (float)MPU9250Data[1] * aRes - accelBias[1];
-    azn = (float)MPU9250Data[2] * aRes - accelBias[2];
+    ax = (float)MPU9250Data[0] * aRes - accelBias[0]; // get actual g value, this depends on scale being set
+    ay = (float)MPU9250Data[1] * aRes - accelBias[1];
+    az = (float)MPU9250Data[2] * aRes - accelBias[2];
 
     // Calculate the gyro value into actual degrees per second
-    gxn = (float)MPU9250Data[4] * gRes; // get actual gyro value, this depends on scale being set
-    gyn = (float)MPU9250Data[5] * gRes;
-    gzn = (float)MPU9250Data[6] * gRes;
+    gx = (float)MPU9250Data[4] * gRes; // get actual gyro value, this depends on scale being set
+    gy = (float)MPU9250Data[5] * gRes;
+    gz = (float)MPU9250Data[6] * gRes;
 
     readMagData(magCount);  // Read the x/y/z adc values
 
@@ -418,54 +341,16 @@ void loop()
       mzn = 0.079606 * mxt - 0.131361 * myt + 1.466734 * mzt;
     }
     // Averaging of sensor values
-    if (count_avg < (max_avg - 1)) { // Just store data for averaging
-      axs += axn;
-      ays += ayn;
-      azs += azn;
-      gxs += gxn;
-      gys += gyn;
-      gzs += gzn;
-      mxs += mxn;
-      mys += myn;
-      mzs += mzn;
-      ++count_avg;
-    } else { // Process and output average data
-      axs += axn;
-      ays += ayn;
-      azs += azn;
-      gxs += gxn;
-      gys += gyn;
-      gzs += gzn;
-      mxs += mxn;
-      mys += myn;
-      mzs += mzn;
-      ax = axs / max_avg;
-      ay = ays / max_avg;
-      az = azs / max_avg;
-      gx = gxs / max_avg;
-      gy = gys / max_avg;
-      gz = gzs / max_avg;
-      mx = mxs / max_avg;
-      my = mys / max_avg;
-      mz = mzs / max_avg;
-      axs = 0;
-      ays = 0;
-      azs = 0;
-      gxs = 0;
-      gys = 0;
-      gzs = 0;
-      mxs = 0;
-      mys = 0;
-      mzs = 0;
-      count_avg = 0;
+    mx = (1 - MAGSMOOTH) * mxn + MAGSMOOTH * mx;
+    my = (1 - MAGSMOOTH) * myn + MAGSMOOTH * my;
+    mz = (1 - MAGSMOOTH) * mzn + MAGSMOOTH * mz;
 
-      Now = micros();
-      deltat_update = ((Now - lastUpdate_update) / 1000000.0f); // set integration time by time elapsed since last filter update
-      lastUpdate_update = Now;
+    Now = micros();
+    deltat_update = ((Now - lastUpdate_update) / 1000000.0f); // set integration time by time elapsed since last filter update
+    lastUpdate_update = Now;
 
-      sum_update += deltat_update; // sum for averaging filter update rate
-      sumCount_update++;
-    }
+    sum_update += deltat_update; // sum for averaging filter update rate
+    sumCount_update++;
   }
 
   Now = micros();
@@ -520,63 +405,6 @@ void loop()
     if (SerialDebug) {
       Serial.print("Gyro temperature is ");  Serial.print(temperature, 1);  Serial.println(" degrees C"); // Print T values to tenths of s degree C
     }
-    /*  D1 = MS5637Read(ADC_D1, OSR);  // get raw pressure value
-      D2 = MS5637Read(ADC_D2, OSR);  // get raw temperature value
-      dT = D2 - Pcal[5] * pow(2, 8); // calculate temperature difference from reference
-      OFFSET = Pcal[2] * pow(2, 17) + dT * Pcal[4] / pow(2, 6);
-      SENS = Pcal[1] * pow(2, 16) + dT * Pcal[3] / pow(2, 7);
-
-      Temperature = (2000 + (dT * Pcal[6]) / pow(2, 23)) / 100;     // First-order Temperature in degrees Centigrade
-      //
-      // Second order corrections
-      if (Temperature > 20)
-      {
-        T2 = 5 * dT * dT / pow(2, 38); // correction for high temperatures
-        OFFSET2 = 0;
-        SENS2 = 0;
-      }
-      if (Temperature < 20)                  // correction for low temperature
-      {
-        T2      = 3 * dT * dT / pow(2, 33);
-        OFFSET2 = 61 * (100 * Temperature - 2000) * (100 * Temperature - 2000) / 16;
-        SENS2   = 29 * (100 * Temperature - 2000) * (100 * Temperature - 2000) / 16;
-      }
-      if (Temperature < -15)                     // correction for very low temperature
-      {
-        OFFSET2 = OFFSET2 + 17 * (100 * Temperature + 1500) * (100 * Temperature + 1500);
-        SENS2 = SENS2 + 9 * (100 * Temperature + 1500) * (100 * Temperature + 1500);
-      }
-      // End of second order corrections
-      //
-      Temperature = Temperature - T2 / 100;
-      OFFSET = OFFSET - OFFSET2;
-      SENS = SENS - SENS2;
-
-      Pressure = (((D1 * SENS) / pow(2, 21) - OFFSET) / pow(2, 15)) / 100; // Pressure in mbar or kPa
-
-      const int station_elevation_m = 1050.0 * 0.3048; // Accurate for the roof on my house; convert from feet to meters
-
-      float baroin = Pressure; // pressure is now in millibars
-
-      // Formula to correct absolute pressure in millbars to "altimeter pressure" in inches of mercury
-      // comparable to weather report pressure
-      float part1 = baroin - 0.3; //Part 1 of formula
-      const float part2 = 0.0000842288;
-      float part3 = pow(part1, 0.190284);
-      float part4 = (float)station_elevation_m / part3;
-      float part5 = (1.0 + (part2 * part4));
-      float part6 = pow(part5, 5.2553026);
-      float altimeter_setting_pressure_mb = part1 * part6; // Output is now in adjusted millibars
-      baroin = altimeter_setting_pressure_mb * 0.02953;
-
-      float altitude = 145366.45 * (1. - pow((Pressure / 1013.25), 0.190284));
-
-      if (SerialDebug) {
-        Serial.print("Digital temperature value = "); Serial.print( (float)Temperature, 2); Serial.println(" C"); // temperature in degrees Celsius
-        Serial.print("Digital temperature value = "); Serial.print(9.*(float) Temperature / 5. + 32., 2); Serial.println(" F"); // temperature in degrees Fahrenheit
-        Serial.print("Digital pressure value = "); Serial.print((float) Pressure, 2);  Serial.println(" mbar");// pressure in millibar
-        Serial.print("Altitude = "); Serial.print(altitude, 2); Serial.println(" feet");
-      } */
 
     // Define output variables from updated quaternion---these are Tait-Bryan angles, commonly used in aircraft orientation.
     // In this coordinate system, the positive z-axis is down toward Earth.
@@ -628,10 +456,10 @@ void loop()
       Serial.print(lin_ay * 1000, 2);
       Serial.print(", ");
       Serial.print(lin_az * 1000, 2);  Serial.println(" mg");
-
-      Serial.print("Filter rate = "); Serial.print((float)sumCount_filter / sum_filter, 2); Serial.println(" Hz");
-      Serial.print("Update rate = "); Serial.print((float)sumCount_update / sum_update, 2); Serial.println(" Hz");
     }
+    Serial.print("Filter rate = "); Serial.print((float)sumCount_filter / sum_filter, 2); Serial.println(" Hz");
+    Serial.print("Update rate = "); Serial.print((float)sumCount_update / sum_update, 2); Serial.println(" Hz");
+
 
 
     // With these settings the filter is updating at a ~145 Hz rate using the Madgwick scheme and
