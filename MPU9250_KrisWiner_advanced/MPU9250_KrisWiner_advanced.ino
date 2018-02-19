@@ -12,7 +12,7 @@
   GND ---------------------- GND */
 
 #include "Wire.h"
-
+#include <math.h>
 
 // See also MPU-9250 Register Map and Descriptions, Revision 4.0, RM-MPU-9250A-00, Rev. 1.4, 9/9/2013 for registers not listed in
 // above document; the MPU9250 and MPU9150 are virtually identical but the latter has a different register map
@@ -204,6 +204,13 @@ float   temperature;          // Stores the MPU9250 gyro internal chip temperatu
 float SelfTest[6];            // holds results of gyro and accelerometer self test
 float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
 
+float phi, theta, radius; // Data preparation for collecting magnet calibration data
+int band, zone, maxZonen;
+int zonesInBand[16] = {1, 6, 12, 18, 24, 24, 30, 30, 30, 30, 24, 24, 18, 12, 6, 1} //Zones per Band in a Tregenza Dome
+int cumulZones[16] = {0, 1, 7, 19, 37, 61, 85, 115, 145, 175, 205, 229, 253, 271, 283, 289}
+float magCalData[290]; // Magnet calibration data
+uint32_t  magCalNumber[290]; // Magnet calibration number of data samples
+
 uint32_t delt_t = 0, count = 0, sumCount_filter = 0, sumCount_update = 0;  // used to control display output rate
 float pitch, yaw, roll;
 float a12, a22, a31, a32, a33;            // rotation matrix coefficients for Euler angles and gravity components
@@ -339,12 +346,29 @@ void loop() {
       mxn = 1.547708 * mxt + 0.015255 * myt + 0.079606 * mzt;  // values from magneto 1.2 calibration calculation
       myn = 0.015255 * mxt + 1.498229 * myt - 0.131361 * mzt;
       mzn = 0.079606 * mxt - 0.131361 * myt + 1.466734 * mzt;
-    }
+    
     // Averaging of sensor values
     mx = (1 - MAGSMOOTH) * mxn + MAGSMOOTH * mx;
     my = (1 - MAGSMOOTH) * myn + MAGSMOOTH * my;
     mz = (1 - MAGSMOOTH) * mzn + MAGSMOOTH * mz;
-
+    
+    radius = sqrt(mxt * mxt + myt * myt + mzt * mzt)
+    theta = atan2(myt, mxt) * 180.0f / PI
+    phi = acos(mzt / radius) * 180.0f / PI
+      
+    band = (int)round(theta/12)
+      
+            switch (band) {
+            case 0:
+              zone = 0;
+              break;
+           case 1:
+              maxZone = 6;
+              zone = 1 + (int)(phi*maxZone/360);
+              break;
+                }
+      
+    }
     Now = micros();
     deltat_update = ((Now - lastUpdate_update) / 1000000.0f); // set integration time by time elapsed since last filter update
     lastUpdate_update = Now;
