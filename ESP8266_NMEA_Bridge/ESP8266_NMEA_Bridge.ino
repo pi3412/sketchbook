@@ -1,5 +1,6 @@
 // ESP8266 NMEA 0183 bridge and filter for GPS data
 // by Pierre Schmitz
+// Board Wemos D1 mini lite
 
 // Disclaimer: Don't use this application for life support systems,
 // navigation or any other situations where system failure may affect
@@ -31,18 +32,18 @@ enum TypSentencePart { Header, Body, Parity, Other };
 TypSentencePart SentencePart (Other);
 
 // For WiFi Station
-const char *ssid = "pups";  // Your ROUTER SSID
-const char *pw = "pups"; // and WiFi PASSWORD
+const char *ssid = "bad connection";  // Your ROUTER SSID
+const char *pw = "EtFc@i*SBIaKUh5UB3iZ"; // and WiFi PASSWORD
 #ifdef STATIC_IP_ADDR
 IPAddress staticIP(192, 168, 1, 75);
 IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
-#endif
 
 // For TCP connection
 const unsigned int localTcpPort = 10130; // 10110 is official TCP and UDP NMEA 0183 Navigational Data Port
 WiFiServer localServer(localTcpPort);
 WiFiClient localClient; // Client for TCP server
+#endif
 
 // For UDP connection
 const unsigned int localUdpPort = 10120; // 10110 is official TCP and UDP NMEA 0183 Navigational Data Port
@@ -107,7 +108,11 @@ void setup() {
   udp.printf("GPS TCP/IP address: ");
   udp.print(WiFi.localIP());
   udp.printf("/");
+
+#ifdef STATIC_IP_ADDR
   udp.println(localTcpPort);
+#endif
+
   udp.endPacket();
 
   udp.beginPacket(remoteUDPIp, remoteUdpPort); // start UDP Packet
@@ -115,8 +120,10 @@ void setup() {
   Serial.printf("Remote UDP IP address: ");
   Serial.println(remoteUDPIp);
 
+#ifdef STATIC_IP_ADDR
   localServer.begin();
   localServer.setNoDelay(true);
+#endif
 
   // swap serial port from USB to attached GPS: GPIO15/D8 (TX) and GPIO13/D7 (RX)
   delay(1000);
@@ -126,6 +133,8 @@ void setup() {
 
 
 void loop() {
+
+#ifdef STATIC_IP_ADDR
 
   //check if there are any new clients
   if (localServer.hasClient()) {
@@ -144,14 +153,17 @@ void loop() {
       Serial.write(sbuf, len);
     }
   }
+#endif
 
   // Read and process serial GPS port
   readCh = Serial.read();
   if (readCh > 0) {
     //    udp.write(readCh);
+#ifdef STATIC_IP_ADDR
     if (localClient && localClient.connected()) {
       localClient.write(readCh);
     }
+#endif
     switch (SentencePart) {
       case Header:
         if (charCount < NMEA_HEADER_LENGTH)  { // Header not yet complete
