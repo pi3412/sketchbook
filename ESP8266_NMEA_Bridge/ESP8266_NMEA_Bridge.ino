@@ -19,7 +19,7 @@
 //#define STATIC_IP_ADDR
 
 // For NMEA Filtering
-const int NMEA_MAX_SIZE(6);
+const int NMEA_MAX_LENGTH(120);
 const int NMEA_HEADER_LENGTH(5);
 const int NMEA_PARITY_LENGTH(2);
 bool usableSentence(false);
@@ -27,7 +27,8 @@ int charCount(0);
 int readCh(0);
 byte parityIn(0);
 byte parityOut(0);
-char text[NMEA_MAX_SIZE];
+char headerText[NMEA_HEADER_LENGTH];
+char parityText[NMEA_PARITY_LENGTH];
 enum TypSentencePart { Header, Body, Parity, Other };
 TypSentencePart SentencePart (Other);
 
@@ -167,7 +168,7 @@ void loop() {
     switch (SentencePart) {
       case Header:
         if (charCount < NMEA_HEADER_LENGTH)  { // Header not yet complete
-          text[charCount++] = readCh;
+          headerText[charCount++] = readCh;
           switch (charCount) {
             case 1:
               parityIn = (byte)readCh;
@@ -184,21 +185,21 @@ void loop() {
           }
         }
         else { // Header complete
-          text[charCount++] = 0;
+          HeaderText[charCount++] = 0;
           usableSentence = 0;
-          if ((text[2] == 'G') && (text[3] == 'G') && (text[4] == 'A')) usableSentence = 1; // If header is xxGGA
-          if ((text[2] == 'R') && (text[3] == 'M') && (text[4] == 'C')) usableSentence = 1; // If header is xxRMC
+          if ((HeaderText[2] == 'G') && (HeaderText[3] == 'G') && (HeaderText[4] == 'A')) usableSentence = 1; // If header is xxGGA
+          if ((HeaderText[2] == 'R') && (HeaderText[3] == 'M') && (HeaderText[4] == 'C')) usableSentence = 1; // If header is xxRMC
           charCount = 0;
           if (usableSentence) {
             Serial1.printf("$GP");
             udp.printf("$GP");
-            Serial1.print(text[2]);
-            udp.print(text[2]);
-            Serial1.print(text[3]);
-            udp.print(text[3]);
-            Serial1.print(text[4]);
-            udp.print(text[4]);
-            text[charCount++] = readCh; // The character (,) of this loop must be read, otherwise it is lost
+            Serial1.print(HeaderText[2]);
+            udp.print(HeaderText[2]);
+            Serial1.print(HeaderText[3]);
+            udp.print(HeaderText[3]);
+            Serial1.print(HeaderText[4]);
+            udp.print(HeaderText[4]);
+            // HeaderText[charCount++] = readCh; // The character (,) of this loop must be read, otherwise it is lost
             Serial1.printf(",");
             udp.printf(",");
             parityIn ^= (byte)readCh;
@@ -222,11 +223,11 @@ void loop() {
         break;
       case Parity:
         if (charCount < NMEA_PARITY_LENGTH)  { // Parity not yet complete
-          text[charCount++] = readCh;
+          parityText[charCount++] = readCh;
         }
         else { // Parity complete
-          text[charCount++] = 0;
-          byte checksum = 16 * fromHex(text[0]) + fromHex(text[1]);
+          parityText[charCount++] = 0;
+          byte checksum = 16 * fromHex(parityText[0]) + fromHex(parityText[1]);
           if (checksum == parityIn) { // Parity OK, sentence can be written with new parity
             Serial1.printf("*");
             udp.printf("*");
