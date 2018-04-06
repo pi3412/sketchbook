@@ -1,5 +1,6 @@
 // ESP8266 NMEA 0183 bridge and filter for GPS data
 // by Pierre Schmitz
+// Nicht diese Datei nehmen, sondern ESP8266_NMEA_Bridge
 
 // Disclaimer: Don't use this application for life support systems,
 // navigation or any other situations where system failure may affect

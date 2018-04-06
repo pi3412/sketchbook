@@ -1,5 +1,6 @@
 // ESP8266 NMEA 0183 bridge and filter for GPS data
 // by Pierre Schmitz
+// Board Wemos D1 mini lite
 
 // Disclaimer: Don't use this application for life support systems,
 // navigation or any other situations where system failure may affect
@@ -18,7 +19,7 @@
 //#define STATIC_IP_ADDR
 
 // For NMEA Filtering
-const int NMEA_MAX_SIZE(6);
+const int NMEA_MAX_LENGTH(120);
 const int NMEA_HEADER_LENGTH(5);
 const int NMEA_PARITY_LENGTH(2);
 bool usableSentence(false);
@@ -26,23 +27,26 @@ int charCount(0);
 int readCh(0);
 byte parityIn(0);
 byte parityOut(0);
-char text[NMEA_MAX_SIZE];
+char headerText[NMEA_HEADER_LENGTH]; // No string, just a character array
+char parityText[NMEA_PARITY_LENGTH]; // No string, just a character array
+char outputText[NMEA_MAX_LENGTH]; // A string
+// char udpText[NMEA_MAX_LENGTH]; // A string
 enum TypSentencePart { Header, Body, Parity, Other };
 TypSentencePart SentencePart (Other);
 
 // For WiFi Station
-const char *ssid = "pups";  // Your ROUTER SSID
-const char *pw = "pups"; // and WiFi PASSWORD
+const char *ssid = "bad connection";  // Your ROUTER SSID
+const char *pw = "EtFc@i*SBIaKUh5UB3iZ"; // and WiFi PASSWORD
 #ifdef STATIC_IP_ADDR
 IPAddress staticIP(192, 168, 1, 75);
 IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
-#endif
 
 // For TCP connection
 const unsigned int localTcpPort = 10130; // 10110 is official TCP and UDP NMEA 0183 Navigational Data Port
 WiFiServer localServer(localTcpPort);
 WiFiClient localClient; // Client for TCP server
+#endif
 
 // For UDP connection
 const unsigned int localUdpPort = 10120; // 10110 is official TCP and UDP NMEA 0183 Navigational Data Port
@@ -107,7 +111,11 @@ void setup() {
   udp.printf("GPS TCP/IP address: ");
   udp.print(WiFi.localIP());
   udp.printf("/");
+
+#ifdef STATIC_IP_ADDR
   udp.println(localTcpPort);
+#endif
+
   udp.endPacket();
 
   udp.beginPacket(remoteUDPIp, remoteUdpPort); // start UDP Packet
@@ -115,8 +123,10 @@ void setup() {
   Serial.printf("Remote UDP IP address: ");
   Serial.println(remoteUDPIp);
 
+#ifdef STATIC_IP_ADDR
   localServer.begin();
   localServer.setNoDelay(true);
+#endif
 
   // swap serial port from USB to attached GPS: GPIO15/D8 (TX) and GPIO13/D7 (RX)
   delay(1000);
@@ -126,6 +136,8 @@ void setup() {
 
 
 void loop() {
+
+#ifdef STATIC_IP_ADDR
 
   //check if there are any new clients
   if (localServer.hasClient()) {
@@ -144,18 +156,21 @@ void loop() {
       Serial.write(sbuf, len);
     }
   }
+#endif
 
   // Read and process serial GPS port
   readCh = Serial.read();
   if (readCh > 0) {
     //    udp.write(readCh);
+#ifdef STATIC_IP_ADDR
     if (localClient && localClient.connected()) {
       localClient.write(readCh);
     }
+#endif
     switch (SentencePart) {
       case Header:
         if (charCount < NMEA_HEADER_LENGTH)  { // Header not yet complete
-          text[charCount++] = readCh;
+          headerText[charCount++] = readCh;
           switch (charCount) {
             case 1:
               parityIn = (byte)readCh;
@@ -172,21 +187,22 @@ void loop() {
           }
         }
         else { // Header complete
-          text[charCount++] = 0;
+          HeaderText[charCount++] = 0;
           usableSentence = 0;
-          if ((text[2] == 'G') && (text[3] == 'G') && (text[4] == 'A')) usableSentence = 1; // If header is xxGGA
-          if ((text[2] == 'R') && (text[3] == 'M') && (text[4] == 'C')) usableSentence = 1; // If header is xxRMC
+          if ((HeaderText[2] == 'G') && (HeaderText[3] == 'G') && (HeaderText[4] == 'A')) usableSentence = 1; // If header is xxGGA
+          if ((HeaderText[2] == 'R') && (HeaderText[3] == 'M') && (HeaderText[4] == 'C')) usableSentence = 1; // If header is xxRMC
           charCount = 0;
           if (usableSentence) {
             Serial1.printf("$GP");
             udp.printf("$GP");
-            Serial1.print(text[2]);
-            udp.print(text[2]);
-            Serial1.print(text[3]);
-            udp.print(text[3]);
-            Serial1.print(text[4]);
-            udp.print(text[4]);
-            text[charCount++] = readCh; // The character (,) of this loop must be read, otherwise it is lost
+ //           outputText;
+            Serial1.print(HeaderText[2]);
+            udp.print(HeaderText[2]);
+            Serial1.print(HeaderText[3]);
+            udp.print(HeaderText[3]);
+            Serial1.print(HeaderText[4]);
+            udp.print(HeaderText[4]);
+            // HeaderText[charCount++] = readCh; // The character (,) of this loop must be read, otherwise it is lost
             Serial1.printf(",");
             udp.printf(",");
             parityIn ^= (byte)readCh;
@@ -210,11 +226,11 @@ void loop() {
         break;
       case Parity:
         if (charCount < NMEA_PARITY_LENGTH)  { // Parity not yet complete
-          text[charCount++] = readCh;
+          parityText[charCount++] = readCh;
         }
         else { // Parity complete
-          text[charCount++] = 0;
-          byte checksum = 16 * fromHex(text[0]) + fromHex(text[1]);
+          parityText[charCount++] = 0;
+          byte checksum = 16 * fromHex(parityText[0]) + fromHex(parityText[1]);
           if (checksum == parityIn) { // Parity OK, sentence can be written with new parity
             Serial1.printf("*");
             udp.printf("*");
@@ -249,3 +265,50 @@ void loop() {
     }
   }
 }
+
+/* Process Header
+
+void processHeader (TypSentencePart* locSP, int* locChar, int* locCC, string* locTXT)
+        if (locCC < NMEA_HEADER_LENGTH)  { // Header not yet complete
+          headerText[charCount++] = readCh;
+          switch (charCount) {
+            case 1:
+              parityIn = (byte)readCh;
+              parityOut = 'G';
+              break;
+            case 2:
+              parityIn ^= (byte)readCh;
+              parityOut ^= 'P';
+              break;
+            default:
+              parityIn ^= (byte)readCh;
+              parityOut ^= (byte)readCh;
+              break;
+          }
+        }
+        else { // Header complete
+          HeaderText[charCount++] = 0;
+          usableSentence = 0;
+          if ((HeaderText[2] == 'G') && (HeaderText[3] == 'G') && (HeaderText[4] == 'A')) usableSentence = 1; // If header is xxGGA
+          if ((HeaderText[2] == 'R') && (HeaderText[3] == 'M') && (HeaderText[4] == 'C')) usableSentence = 1; // If header is xxRMC
+          charCount = 0;
+          if (usableSentence) {
+            Serial1.printf("$GP");
+            udp.printf("$GP");
+ //           outputText;
+            Serial1.print(HeaderText[2]);
+            udp.print(HeaderText[2]);
+            Serial1.print(HeaderText[3]);
+            udp.print(HeaderText[3]);
+            Serial1.print(HeaderText[4]);
+            udp.print(HeaderText[4]);
+            // HeaderText[charCount++] = readCh; // The character (,) of this loop must be read, otherwise it is lost
+            Serial1.printf(",");
+            udp.printf(",");
+            parityIn ^= (byte)readCh;
+            parityOut ^= (byte)readCh;
+            SentencePart = Body;
+          }
+          else SentencePart = Other;
+        }
+*/
