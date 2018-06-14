@@ -37,6 +37,8 @@ TypSentencePart SentencePart (Other);
 // For WiFi Station
 const char *ssid = "bad connection";  // Your ROUTER SSID
 const char *pw = "EtFc@i*SBIaKUh5UB3iZ"; // and WiFi PASSWORD
+// const char *ssid = "bad connection";  // Your ROUTER SSID
+// const char *pw = "EtFc@i*SBIaKUh5UB3iZ"; // and WiFi PASSWORD
 #ifdef STATIC_IP_ADDR
 IPAddress staticIP(192, 168, 1, 75);
 IPAddress gateway(192, 168, 1, 1);
@@ -265,50 +267,3 @@ void loop() {
     }
   }
 }
-
-/* Process Header
-
-void processHeader (TypSentencePart* locSP, int* locChar, int* locCC, string* locTXT)
-        if (locCC < NMEA_HEADER_LENGTH)  { // Header not yet complete
-          headerText[charCount++] = readCh;
-          switch (charCount) {
-            case 1:
-              parityIn = (byte)readCh;
-              parityOut = 'G';
-              break;
-            case 2:
-              parityIn ^= (byte)readCh;
-              parityOut ^= 'P';
-              break;
-            default:
-              parityIn ^= (byte)readCh;
-              parityOut ^= (byte)readCh;
-              break;
-          }
-        }
-        else { // Header complete
-          HeaderText[charCount++] = 0;
-          usableSentence = 0;
-          if ((HeaderText[2] == 'G') && (HeaderText[3] == 'G') && (HeaderText[4] == 'A')) usableSentence = 1; // If header is xxGGA
-          if ((HeaderText[2] == 'R') && (HeaderText[3] == 'M') && (HeaderText[4] == 'C')) usableSentence = 1; // If header is xxRMC
-          charCount = 0;
-          if (usableSentence) {
-            Serial1.printf("$GP");
-            udp.printf("$GP");
- //           outputText;
-            Serial1.print(HeaderText[2]);
-            udp.print(HeaderText[2]);
-            Serial1.print(HeaderText[3]);
-            udp.print(HeaderText[3]);
-            Serial1.print(HeaderText[4]);
-            udp.print(HeaderText[4]);
-            // HeaderText[charCount++] = readCh; // The character (,) of this loop must be read, otherwise it is lost
-            Serial1.printf(",");
-            udp.printf(",");
-            parityIn ^= (byte)readCh;
-            parityOut ^= (byte)readCh;
-            SentencePart = Body;
-          }
-          else SentencePart = Other;
-        }
-*/
